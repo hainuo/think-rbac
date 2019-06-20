@@ -7,6 +7,9 @@
     "rbac",
     "thinkphp"
   ],
+  "license": [
+    "Apache-2.0"
+  ],
   "authors": [
     {
       "name": "zouxiang",
