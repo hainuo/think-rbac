@@ -416,6 +416,7 @@ class Auth
      */
     private static function sessionGet($path =''){
         $session_prefix = config('thinkcms.session_prefix');
+//        dump($session_prefix.$path);exit;
         $user           = session($session_prefix.$path);
         return $user;
     }
