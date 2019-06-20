@@ -1,7 +1,7 @@
 {
     "name": "hainuo/think-rbac",
     "description": "基于 zouxiang0639/thinkcms-auth 制作的通用权限管理系统，支持thinkphp5.0最新版本",
-    "type": "aut,rbac,thinkphp",
+    "type": "aut rbac thinkphp think-auth think-rbac",
     "authors": [
         {
             "name": "zouxiang",
