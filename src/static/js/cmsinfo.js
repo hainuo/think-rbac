@@ -60,9 +60,9 @@
                 if(json.code == 1){
 
                     $('#alert').html(alertSuccess(json.msg));
-                    if (confirm('是否离开此页')){
+                    // if (confirm('是否离开此页')){
                         window.location.href=json.url;
-                    }
+                    // }
 
                 }else if(json.code == 0){
                     $('#alert').html(alertDanger(json.msg));

@@ -270,13 +270,14 @@ class Auth
      */
     protected function authCheck($url, $relation = 'or')
     {
+        dump($url);
 
         $rule = array($url);
         $list = []; //保存验证通过的规则名)
         $param = $this->param;
 
         $rules = self::authMenu(["AuthAccess.rule_name" => ["in", $rule]]);
-
+        dump($rules);
         //是否为超级管理员角色
         if ($rules === true) {
             //行为日志
