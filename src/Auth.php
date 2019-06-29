@@ -25,36 +25,37 @@ use think\auth\model\Menu;
 
 class Auth
 {
-    const  PATH                 = __DIR__;
-    public $log                 = true;
-    public $noNeedCheckRules    = [];           //不需要检查的路由规则
+    const  PATH = __DIR__;
+    public $log = true;
+    public $noNeedCheckRules = [];           //不需要检查的路由规则
 
     public function __construct()
     {
-        $this->request      = request();
+        $this->request = request();
 
-        $this->param        = $this->request->param();
-        $this->module       = $this->request->module();
-        $this->controller   = $this->request->controller();
-        $this->action       = $this->request->action();
+        $this->param = $this->request->param();
+        $this->module = $this->request->module();
+        $this->controller = $this->request->controller();
+        $this->action = $this->request->action();
 
     }
 
     /**
      * 加载控制器方法
      * @access public
-     * @param  string  $name 方法名
+     * @param string $name 方法名
      * @return mixed
      */
-    public function autoload($name){
+    public function autoload($name)
+    {
 
         $controller = new Rbac($this->request);
 
-        if(strtolower($this->controller) == 'auth' && method_exists($controller,$name)){
-          return  call_user_func([$controller, $name]);
+        if (strtolower($this->controller) == 'auth' && method_exists($controller, $name)) {
+            return call_user_func([$controller, $name]);
         }
 
-       return false;
+        return false;
     }
 
     /**
@@ -62,23 +63,25 @@ class Auth
      * @access public
      * @return mixed
      */
-    public function auth(){
-        $uid                = self::sessionGet('user.uid');
-        $controller         = Loader::parseName($this->controller,1); //字符串命名风格转换
-        $rule               = strtolower("{$this->module}/{$controller}/{$this->action}");
+    public function auth()
+    {
+        $uid = self::sessionGet('user.uid');
+        $controller = Loader::parseName($this->controller, 1); //字符串命名风格转换
+        $rule = strtolower("{$this->module}/{$controller}/{$this->action}");
         //如果用户角色是1，则无需判断
-        if(empty($uid)){
+        if (empty($uid)) {
             return false;
         }
-        if($uid == 1){
+        $supperId = config('rbac.supper_id') ?: -1;
+        if ($uid == $supperId) {
             self::actionLog($rule);
             return true;
         }
         //无需认证
-        $noNeedCheckRules   = array_merge($this->noNeedCheckRules,[$this->module.'/auth/openfile',$this->module.'/auth/cache']);
-        if( !in_array($rule,$noNeedCheckRules) ){
-            return self::authCheck($rule,'or');
-        }else{
+        $noNeedCheckRules = array_merge($this->noNeedCheckRules, [$this->module . '/auth/openfile', $this->module . '/auth/cache']);
+        if (!in_array($rule, $noNeedCheckRules)) {
+            return self::authCheck($rule, 'or');
+        } else {
             return true;
         }
 
@@ -89,24 +92,25 @@ class Auth
      * @access public
      * @return array
      */
-    public static function menuCheck(){
+    public static function menuCheck()
+    {
 
         $uid = self::sessionGet('user.uid');
 
-        if(empty($uid)){
+        if (empty($uid)) {
             return false;
         }
         $where['status'] = 1;
+        $supperId = config('rbac.supper_id') ?: -1;
+        if ($uid != $supperId) {
+            $authMenu = self::authMenu('', false);
 
-        if($uid != 1){
-            $authMenu        = self::authMenu('',false);
-
-            if(is_array($authMenu)){
-               $where['id']=['in',array_keys($authMenu)];
+            if (is_array($authMenu)) {
+                $where['id'] = ['in', array_keys($authMenu)];
             }
         }
 
-        $menu       = Menu::where($where)->order(["list_order" => "asc",'id'=>'asc'])->column('*','id');
+        $menu = Menu::where($where)->order(["list_order" => "asc", 'id' => 'asc'])->column('*', 'id');
 
         return $menu;
     }
@@ -115,52 +119,53 @@ class Auth
     /**
      * 行为日志检查
      * @access public
-     * @param  string          $rule        日志规则
+     * @param string $rule 日志规则
      * @return array
      */
-    private function actionLog($rule){
+    private function actionLog($rule)
+    {
 
         //是否需要打开 行为日志检查
-        if($this->log === false){
+        if ($this->log === false) {
             return true;
         }
 
-        $logMenu    = Cache('logMenu');
-        if(empty($logMenu)){    //缓存日志24小时
-            $logMenu    = Menu::actionLogMenu();
-            Cache('logMenu',$logMenu,86400);
+        $logMenu = Cache('logMenu');
+        if (empty($logMenu)) {    //缓存日志24小时
+            $logMenu = Menu::actionLogMenu();
+            Cache('logMenu', $logMenu, 86400);
         }
 
-        $menu       =   isset($logMenu[$rule])?$logMenu[$rule]:'';
+        $menu = isset($logMenu[$rule]) ? $logMenu[$rule] : '';
 
-        $log        = [];
-        if(empty($menu)){
+        $log = [];
+        if (empty($menu)) {
             return true;
         }
 
         //子集行为日志菜单匹配
-        if(isset($menu['child'])){
-           foreach($menu['child'] as $v){
-             if(!empty($v['rule_param'])){
-                 $condition = '';
-                 $command   = preg_replace('/\{(\w*?)\}/', '$this->param[\'\\1\']', $v['rule_param']);
-                 @(eval('$condition=(' . $command . ');'));
-                 if ($condition and $v['request'] == $this->request->method()) {
-                     $log = $v;
-                 }
-             }
-           }
-        }
-
-        //父集行为日志菜单匹配
-        if(empty($log)){
-            if($menu['request'] == $this->request->method()){
-                $log    = $menu;
+        if (isset($menu['child'])) {
+            foreach ($menu['child'] as $v) {
+                if (!empty($v['rule_param'])) {
+                    $condition = '';
+                    $command = preg_replace('/\{(\w*?)\}/', '$this->param[\'\\1\']', $v['rule_param']);
+                    @(eval('$condition=(' . $command . ');'));
+                    if ($condition and $v['request'] == $this->request->method()) {
+                        $log = $v;
+                    }
+                }
             }
         }
 
-        if(!empty($log)){
-            return self::createLog($log['log_rule'],$log['name']);
+        //父集行为日志菜单匹配
+        if (empty($log)) {
+            if ($menu['request'] == $this->request->method()) {
+                $log = $menu;
+            }
+        }
+
+        if (!empty($log)) {
+            return self::createLog($log['log_rule'], $log['name']);
         }
 
         return true;
@@ -169,26 +174,27 @@ class Auth
 
     /**
      * 创建行为日志
-     * @param  string       $logrule    行为日志规则
-     * @param  string       $title      标题
-     * @param  int          $uid        执行者ID
+     * @param string $logrule 行为日志规则
+     * @param string $title 标题
+     * @param int $uid 执行者ID
      * @return array
      */
-    public function  createLog($logrule,$title){
-        $uid    = self::sessionGet('user.uid');
-        $param  = $this->param;
+    public function createLog($logrule, $title)
+    {
+        $uid = self::sessionGet('user.uid');
+        $param = $this->param;
         $condition = '';
-        $command   = preg_replace('/\{(\w*?)\}/', '{$param[\'\\1\']}', $logrule);
+        $command = preg_replace('/\{(\w*?)\}/', '{$param[\'\\1\']}', $logrule);
         @(eval('$condition= (string)("' . $command . '");'));
         //dump($condition);die;
-        $data   = [
-            'action_ip'     => ip2long($this->request->ip()),
-            'username'      => self::sessionGet('user.nickname'),
-            'create_time'   => time(),
-            'log_url'       => '/'.$this->request->pathinfo(),
-            'log'           => $condition,
-            'user_id'       => $uid,
-            'title'         => $title
+        $data = [
+            'action_ip'   => ip2long($this->request->ip()),
+            'username'    => self::sessionGet('user.nickname'),
+            'create_time' => time(),
+            'log_url'     => '/' . $this->request->pathinfo(),
+            'log'         => $condition,
+            'user_id'     => $uid,
+            'title'       => $title
         ];
         return ActionLog::create($data);
     }
@@ -196,59 +202,60 @@ class Auth
     /**
      * 检查路由权限
      * @access public static
-     * @param  string       $path       路由
-     * @param  array       $param      参数
+     * @param string $path 路由
+     * @param array $param 参数
      * @return bool
      */
-    public static function checkPath($path,$param=[]){
-        $uid        = self::sessionGet('user.uid');
-        if($uid == 1){
+    public static function checkPath($path, $param = [])
+    {
+        $uid = self::sessionGet('user.uid');
+        $supperId = \config('rbac.supper_id') ?: -1;
+        if ($uid == $supperId) {
             return true;
         }
 
-        $authMenu   = Cache::get('authMenu_'.$uid);
+        $authMenu = Cache::get('authMenu_' . $uid);
 
-        if(!$authMenu){ //存入缓存 授权菜单
-            $authMenu   = self::authMenu();
-            Cache::set('authMenu_'.$uid,$authMenu,600);
+        if (!$authMenu) { //存入缓存 授权菜单
+            $authMenu = self::authMenu();
+            Cache::set('authMenu_' . $uid, $authMenu, 600);
         }
 
-        $count      = count(explode('/',$path));
-        if($count == 2){
+        $count = count(explode('/', $path));
+        if ($count == 2) {
             $module = Request::instance()->module();
-            $path   = "$module/$path";
+            $path = "$module/$path";
         }
 
         $path = strtolower($path);
 
         //是否为超级管理员角色
-        if($path === true ){
+        if ($path === true) {
             return true;
-        }else if($path === false){
+        } else if ($path === false) {
             return false;
         }
 
         //超级管理员角色跳过路由验证
-        if($authMenu === true){
+        if ($authMenu === true) {
             return true;
         }
 
         //验证路由
-        foreach ($authMenu as $v){
-            if($v['rule_name'] == $path){
-                if(empty($v['rule_param'])){  //验证规则为空,表示所有通过
+        foreach ($authMenu as $v) {
+            if ($v['rule_name'] == $path) {
+                if (empty($v['rule_param'])) {  //验证规则为空,表示所有通过
                     return true;
-                }else{                       //如有验证规则,根据规则验证
+                } else {                       //如有验证规则,根据规则验证
                     $condition = false;
                     $command = preg_replace('/\{(\w*?)\}/', '$param[\'\\1\']', $v['rule_param']);
                     @(eval('$condition=(' . $command . ');'));
-                    if($condition){
+                    if ($condition) {
                         return true;
                     }
                 }
             }
         }
-
 
 
         return false;
@@ -257,30 +264,31 @@ class Auth
     /**
      * 检查权限
      * @access protected
-     * @param  string          $url   路由
-     * @param  string          $relation
+     * @param string $url 路由
+     * @param string $relation
      * @return mixed
      */
-    protected function authCheck($url,$relation='or'){
+    protected function authCheck($url, $relation = 'or')
+    {
 
-        $rule   = array($url);
-        $list   = []; //保存验证通过的规则名)
-        $param  = $this->param;
+        $rule = array($url);
+        $list = []; //保存验证通过的规则名)
+        $param = $this->param;
 
-        $rules = self::authMenu(["AuthAccess.rule_name"=>["in",$rule]]);
+        $rules = self::authMenu(["AuthAccess.rule_name" => ["in", $rule]]);
 
         //是否为超级管理员角色
-        if($rules === true){
+        if ($rules === true) {
             //行为日志
             self::actionLog($url);
             return true;
-        }else if($rules === false){
+        } else if ($rules === false) {
             return false;
         }
 
-        foreach ($rules as $rule){
+        foreach ($rules as $rule) {
             if (!empty($rule['rule_param'])) { //根据rule_param进行验证
-                $condition  = false;
+                $condition = false;
 
                 $command = preg_replace('/\{(\w*?)\}/', '$param[\'\\1\']', $rule['rule_param']);
 
@@ -289,7 +297,7 @@ class Auth
                     $list[] = strtolower($rule['name']);
                 }
 
-            }else{
+            } else {
                 $list[] = strtolower($rule['name']);
             }
         }
@@ -314,34 +322,35 @@ class Auth
     /**
      * 权限访问清单
      * @access private
-     * @param array     $where 查询附加条件
-     * @param bool      $default  隐藏的菜单
+     * @param array $where 查询附加条件
+     * @param bool $default 隐藏的菜单
      * @return array
      */
-    private static function authMenu($where=[],$default = true){
-        $uid        = self::sessionGet('user.uid');
-        $rule       = [];
-        $roleId     = AuthRoleUser::innerAuthRole($uid);
+    private static function authMenu($where = [], $default = true)
+    {
+        $uid = self::sessionGet('user.uid');
+        $rule = [];
+        $roleId = AuthRoleUser::innerAuthRole($uid);
 
-        if(in_array(1,$roleId)){
+        if (in_array(1, $roleId)) {
             return true;
         }
-        $roleId     = implode(',',$roleId);
+        $roleId = implode(',', $roleId);
         //角色权限 or 管理员权限
-        if($default === true){
-            $rule   = AuthAccess::innerAuthRule($roleId,$uid,$where);
-           // dump($rule);die;
-        }else if($default === false){
+        if ($default === true) {
+            $rule = AuthAccess::innerAuthRule($roleId, $uid, $where);
+            // dump($rule);die;
+        } else if ($default === false) {
 
-            $rule       = AuthAccess::where($where)
+            $rule = AuthAccess::where($where)
                 ->where('(type="admin_url" and role_id in(:roleId))or(type="admin" and role_id =:uid)', [
-                    'roleId'    => $roleId,
-                    'uid'       => $uid
+                    'roleId' => $roleId,
+                    'uid'    => $uid
                 ])
-                ->column('*','menu_id');
+                ->column('*', 'menu_id');
         }
 
-        if(empty($rule)){
+        if (empty($rule)) {
             return false;
         }
         return $rule;
@@ -352,34 +361,36 @@ class Auth
      * 检测用户是否登录
      * @return mixed
      */
-    public static function is_login(){
+    public static function is_login()
+    {
         $user = self::sessionGet('user');
         if (empty($user)) {
             return false;
         } else {
-            return  self::sessionGet('user_sign') == self::data_auth_sign($user) ? $user : false;
+            return self::sessionGet('user_sign') == self::data_auth_sign($user) ? $user : false;
         }
     }
 
     /**
      * 用户登入
      * @access private static
-     * @param  int      $uid 用户ID
-     * @param  string   $nickname 用户昵称
+     * @param int $uid 用户ID
+     * @param string $nickname 用户昵称
      * @return array
      */
-    public static function login($uid,$nickname){
-        if(empty($uid) && empty($nickname)){
+    public static function login($uid, $nickname)
+    {
+        if (empty($uid) && empty($nickname)) {
             return false;
         }
-        $session_prefix = config('thinkcms.session_prefix');
-        $user           = [
-                            'uid'       => $uid,
-                            'nickname'  => $nickname,
-                            'time'      => time()
-                        ];
-        session($session_prefix.'user', $user);
-        session($session_prefix.'user_sign', self::data_auth_sign($user));
+        $session_prefix = config('rbac.session_prefix');
+        $user = [
+            'uid'      => $uid,
+            'nickname' => $nickname,
+            'time'     => time()
+        ];
+        session($session_prefix . 'user', $user);
+        session($session_prefix . 'user_sign', self::data_auth_sign($user));
         return true;
     }
 
@@ -388,20 +399,22 @@ class Auth
      * @access private static
      * @return bool
      */
-    public static function logout(){
-        $session_prefix = config('thinkcms.session_prefix');
-        session($session_prefix.'user', '');
-        session($session_prefix.'user_sign', '');
+    public static function logout()
+    {
+        $session_prefix = config('rbac.session_prefix');
+        session($session_prefix . 'user', '');
+        session($session_prefix . 'user_sign', '');
         return true;
     }
 
     /**
      * 数据签名认证
      * @access private static
-     * @param  array  $data 被认证的数据
+     * @param array $data 被认证的数据
      * @return string       签名
      */
-    private static  function data_auth_sign($data) {
+    private static function data_auth_sign($data)
+    {
         $code = http_build_query($data); //url编码并生成query字符串
         $sign = sha1($code); //生成签名
         return $sign;
@@ -411,13 +424,13 @@ class Auth
     /**
      * 读取session
      * @access private static
-     * @param  string  $path 被认证的数据
+     * @param string $path 被认证的数据
      * @return mixed
      */
-    private static function sessionGet($path =''){
-        $session_prefix = config('thinkcms.session_prefix');
-//        dump($session_prefix.$path);exit;
-        $user           = session($session_prefix.$path);
+    private static function sessionGet($path = '')
+    {
+        $session_prefix = config('rbac.session_prefix');
+        $user = session($session_prefix . $path);
         return $user;
     }
 

@@ -2,7 +2,7 @@
 <?php
 
     function get_file($file){
-        $directory = Config('thinkcms.style_directory');
+        $directory = Config('rbac.style_directory');
 
         if(empty($directory)){
             return url('auth/openFile',['file'=>$file]);

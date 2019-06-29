@@ -13,7 +13,8 @@
          │   ├── controller
          │   │   ├── AdminBase.php
          │   │   ├── Auth.php
-         │   └── view
+         │   ├── view   
+         |   └── config.php   
         ```
     2. Auth.php内容如下
         ```php
@@ -36,6 +37,17 @@
                 return abort(404, '页面不存在');
             }
         }
+        ```
+        config.php 内容如下
+        ```php
+        return [
+            //项目配置
+            'rbac' => [
+                'session_prefix'  => 'rbac_', //rbac缓存数据的前缀
+                'supper_id'       => 28,//超级管理员ID
+                'style_directory' => null, //静态文件目录  默认不设置
+            ],
+        ];
         ```
  4. 管理访问  基于上述admin的访问路径
      ```html
